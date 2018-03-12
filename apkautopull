@@ -6,6 +6,8 @@
 # No warranty. No support
 # I came from: https://github.com/ipbsec/apkautopull/blob/master/apkautopull
 # Wiki https://github.com/ipbsec/apkautopull/wiki
+# Usage ./apkautopull appname
+# Eg: ./apkautopull chrome
 #----------------------------------------------
 
 echo -e "*****************************************"
