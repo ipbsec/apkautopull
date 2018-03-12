@@ -2,8 +2,10 @@
 #Pull APK from device
 #A script to speed up pulling APK from device
 #----------------------------------------------
-#Github: ipbsec
-#No warranty. No support
+# Github: ipbsec
+# No warranty. No support
+# I came from: https://github.com/ipbsec/apkautopull/blob/master/apkautopull
+# Wiki https://github.com/ipbsec/apkautopull/wiki
 #----------------------------------------------
 
 echo -e "*****************************************"
