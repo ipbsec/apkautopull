@@ -1,0 +1,53 @@
+#!/bin/bash
+#Pull APK from device
+#A script to speed up pulling APK from device
+#----------------------------------------------
+#Github: ipbsec
+#No warranty. No support
+#----------------------------------------------
+
+echo -e "*****************************************"
+echo -e "*           APK Auto Pull               *"
+echo -e "*****************************************"
+echo -e ""
+
+
+if [ -z "$1" ]
+then
+echo -e "Assuming ADB  is running, device is connected and authorised"
+echo -e "Enter a distinct app name or partial name"
+read appname
+else
+appname=$1
+fi
+
+
+echo -e "Looking for $appname"
+matchcount=`adb shell pm list packages -f $appname | wc -l`
+
+if [ $matchcount -gt 1 ]
+then
+ echo -e  "Too many matches, narrow your term to a unique name or part of the name  and try again"
+ echo -e  "These are the matches"
+ adb shell pm list packages -f $appname
+ echo -e "Too many matches, specify your filter more"
+ exit
+fi
+
+
+echo -e "Found single match: "
+adb shell pm list packages -f $appname
+echo -e "Getting APK Path"
+name=`adb shell pm list packages -f $appname` 
+apklocationpath=${name%=*}
+apk=${apklocationpath##package:}
+echo -e "Pulling apk from device"
+adb pull $apk
+echo -e "Pulled base.apk"
+echo -e "Renaming apk"
+mv  base.apk  $appname.apk
+echo "Saved $appname.apk"
+echo -e "Done"
+
+
+
