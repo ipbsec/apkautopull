@@ -1,57 +1,192 @@
-#!/bin/bash
-#Pull APK from device
-#A script to speed up pulling APK from device
-#----------------------------------------------
-# Github: ipbsec
-# No warranty. No support
-# I came from: https://github.com/ipbsec/apkautopull
-# Wiki https://github.com/ipbsec/apkautopull/wiki
-# Usage ./apkautopull appname
-# Eg: ./apkautopull chrome
-#----------------------------------------------
+#!/usr/bin/env bash
 
-echo -e "*****************************************"
-echo -e "*           APK Auto Pull               *"
-echo -e "*****************************************"
-echo -e ""
+matchCount=0
+apkLocationPath=""
+apkPath=""
+friendlyName=""
+
+function Help {
+  echo -e \\n"APK Auto Pull Help"\\n
+  echo -e "Basic usage: apkautopull -s appname"
+  echo -e "Basic usage will pull a single apk if there is a single match"
+  echo -e \\n"Optional Switches"
+  echo "-m Pull multiple matches. Don't quit if there's more than a single name match"
+  echo "-a Pull ALL APKs"
+  echo "-v Version info"
+  echo "-h This help screen"
+  exit 0
+}
+
+function Version {
+echo -e "apkautopull v2.0"
+echo -e "https://github.com/ipbsec/apkautopull"
+}
+
+function GetAll {
+CountMatches .
+echo -e "Retrieving ALL $matchCount APKs from your device"
+echo -e "This may take a while!....."
+GetMultiple .
+echo -e "Done!"
+}
 
 
-if [ -z "$1" ]
+function CountMatches {
+matchCount=`adb shell pm list packages -f $1 | wc -l`
+
+}
+
+function GetSingle {
+
+  #echo -e "entered get single with $1"
+  GetPath $1
+  echo -e "Pulling APK"
+  PullAPK $apkPath  
+  GetFriendlyName
+  RenameAPK		
+}
+
+function GetMultiple {
+declare -a array=(`adb shell pm list packages -f $1`)
+arrayLength=${#array[@]}
+ echo -e "$arrayLength matches"
+for ((i=0; i<${arrayLength}; i++));
+ do
+   
+   a=${array[i]}
+   #echo -e "unique name is $a"
+   com=${a##*=}
+   c2=`trim $com`
+   #echo -e "$c2"
+   GetSingle $c2
+ done
+
+}
+
+function RunGetSingle {
+
+ if [ $matchCount -gt 1 ]
+ then
+  FailMultiple $1
+ fi
+  WriteMatchList $1
+ GetSingle $1	
+
+}
+
+
+function FailMultiple {
+  echo -e "Multiple matches. apkautopull is in single mode. Quitting."
+  echo -e "Provide a more specific filter or use -m to pull multiple"
+  echo -e "Found the following matches"
+  WriteMatchList $1
+  echo -e "Multiple matches. Quitting."
+  echo -e "Provide a more specific filter or use -m to pull multiple"
+  exit 1
+}
+
+
+function WriteMatchList {
+adb shell pm list packages -f $1
+}
+
+function GetPath {
+ #echo -e "entered getpath with $1"
+ fullName=`adb shell pm list packages -f $1`
+ #echo -e "full name is $fullName"
+ apkLocationPath=${fullName%=*}
+ #echo -e "location is $apkLocationPath"
+ apkPath=${apkLocationPath##package:}
+ #echo -e "path is $apkPath"
+}
+
+function PullAPK {
+ #echo -e "pull param is $1"
+ adb pull $1
+}
+
+function RenameAPK {
+echo -e "apk start is $apkPath"
+if [[ $apkPath == /sys* ]]
 then
-echo -e "Assuming ADB  is running, device is connected and authorised"
-echo -e "Enter a distinct app name or partial name"
-read appname
+echo -e "System app. Skipping rename"
 else
-appname=$1
+ echo -e "Renaming APK"
+ mv base.apk $friendlyName.apk
+ echo -e "Saved as $friendlyName.apk"
 fi
+}
+
+function GetFriendlyName {
+ a=${apkPath:10} #strip the /data/app/ THIS IS WRONG< SOMETIMES CAN BE /SYSTEM
+ friendlyName=${a:: -9} #strip the /base/apk
+}
+
+function Banner {
+ echo -e "******************************"
+ echo -e "*****  apkautopull v2.0  *****"
+ echo -e "******************************"
+}
 
 
-echo -e "Looking for $appname"
-matchcount=`adb shell pm list packages -f $appname | wc -l`
+trim() {
+    local var="$*"
+    # remove leading whitespace characters
+    var="${var#"${var%%[![:space:]]*}"}"
+    # remove trailing whitespace characters
+    var="${var%"${var##*[![:space:]]}"}"   
+    echo -n "$var"
+}
 
-if [ $matchcount -gt 1 ]
+
+#Expect 1 arg
+if [ $# -eq 0 ]
 then
- echo -e  "Too many matches, narrow your term to a unique name or part of the name  and try again"
- echo -e  "These are the matches"
- adb shell pm list packages -f $appname
- echo -e "Too many matches, specify your filter more"
- exit
+echo "Expected at least one argument or switch"
+  Help
 fi
 
 
-echo -e "Found single match: "
-adb shell pm list packages -f $appname
-echo -e "Getting APK Path"
-name=`adb shell pm list packages -f $appname` 
-apklocationpath=${name%=*}
-apk=${apklocationpath##package:}
-echo -e "Pulling apk from device"
-adb pull $apk
-echo -e "Pulled base.apk"
-echo -e "Renaming apk"
-mv  base.apk  $appname.apk
-echo "Saved $appname.apk"
-echo -e "Done"
+#Handle the command line switches
+OPTIND=1
+while getopts as:m:hv cmdSwitch; do
+  case $cmdSwitch in
+  
+    a) #all
+      Banner
+      GetAll
+      exit 0
+      ;;
+    s) #named
+      Banner
+      echo -e "Searching device for $OPTARG"
+      CountMatches $OPTARG
+      echo -e "Found $matchCount matches"
+      RunGetSingle $OPTARG
+      exit 0
+      ;;
+    m) #multiple
+      Banner
+      CountMatches $OPTARG
+      echo -e "Retrieving $matchCount APKs from your device matching $OPTARG"
+      GetMultiple $OPTARG
+      exit 0
+      ;;
+    h) 
+      Banner 
+      Help
+      ;;
+    v)
+      Banner  
+      Version
+      ;;
+    \?) 
+      echo -e \\n"Unknown switch. -h for help"
+      exit 2
+      ;;
+  esac
+done
+shift $((OPTIND-1))
 
 
-
+exit 0
